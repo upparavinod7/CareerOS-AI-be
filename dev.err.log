@@ -1,0 +1,107 @@
+MongoDB initial connect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+MongoDB reconnect failed: connect ECONNREFUSED 127.0.0.1:27017
+node:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module 'mongodb-memory-server'
+Require stack:
+- C:\Users\UPPARA VINOD\Documents\server\config\db.js
+- C:\Users\UPPARA VINOD\Documents\server\controllers\authController.js
+- C:\Users\UPPARA VINOD\Documents\server\routes\authRoutes.js
+- C:\Users\UPPARA VINOD\Documents\server\app.js
+- C:\Users\UPPARA VINOD\Documents\server\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at require (node:internal/modules/helpers:152:16)
+    at Object.<anonymous> (C:\Users\UPPARA VINOD\Documents\server\config\db.js:2:31)
+    at Module._compile (node:internal/modules/cjs/loader:1761:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\UPPARA VINOD\\Documents\\server\\config\\db.js',
+    'C:\\Users\\UPPARA VINOD\\Documents\\server\\controllers\\authController.js',
+    'C:\\Users\\UPPARA VINOD\\Documents\\server\\routes\\authRoutes.js',
+    'C:\\Users\\UPPARA VINOD\\Documents\\server\\app.js',
+    'C:\\Users\\UPPARA VINOD\\Documents\\server\\index.js'
+  ]
+}
+
+Node.js v24.13.0
+node:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module 'mongodb-memory-server'
+Require stack:
+- C:\Users\UPPARA VINOD\Documents\server\config\db.js
+- C:\Users\UPPARA VINOD\Documents\server\controllers\authController.js
+- C:\Users\UPPARA VINOD\Documents\server\routes\authRoutes.js
+- C:\Users\UPPARA VINOD\Documents\server\app.js
+- C:\Users\UPPARA VINOD\Documents\server\index.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at require (node:internal/modules/helpers:152:16)
+    at Object.<anonymous> (C:\Users\UPPARA VINOD\Documents\server\config\db.js:2:31)
+    at Module._compile (node:internal/modules/cjs/loader:1761:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\UPPARA VINOD\\Documents\\server\\config\\db.js',
+    'C:\\Users\\UPPARA VINOD\\Documents\\server\\controllers\\authController.js',
+    'C:\\Users\\UPPARA VINOD\\Documents\\server\\routes\\authRoutes.js',
+    'C:\\Users\\UPPARA VINOD\\Documents\\server\\app.js',
+    'C:\\Users\\UPPARA VINOD\\Documents\\server\\index.js'
+  ]
+}
+
+Node.js v24.13.0
+MongoDB initial connect failed: connect ECONNREFUSED 127.0.0.1:27017
+Using in-memory MongoDB fallback (data resets on restart).
+^C^C

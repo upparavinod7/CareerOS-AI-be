@@ -1,0 +1,8 @@
+CareerOS AI API running on port 5001
+[0mGET /health [32m200[0m 1.582 ms - 72[0m
+[0mPOST /api/v1/auth/register [31m503[0m 1.347 ms - 58[0m
+[0mGET /health [32m200[0m 0.408 ms - 73[0m
+[0mPOST /api/v1/auth/register [31m503[0m 0.247 ms - 58[0m
+[0mPOST /api/v1/auth/register [31m503[0m 0.213 ms - 58[0m
+[0mPOST /api/v1/auth/register [31m503[0m 0.366 ms - 58[0m
+[0mGET /health [32m200[0m 0.363 ms - 74[0m
