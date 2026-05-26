@@ -38,6 +38,7 @@ const roleAliases = {
     "frontend engineer": "Frontend Developer",
     "frontend developer": "Frontend Developer",
     "front end developer": "Frontend Developer",
+    "full stack developer": "Frontend Developer",
     "devops": "DevOps Engineer",
     "devops engineer": "DevOps Engineer"
 };
