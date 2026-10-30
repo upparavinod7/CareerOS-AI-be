@@ -12,7 +12,9 @@ const {
     rejectApplication,
     getHistory,
     getSettings,
-    updateSettings
+    updateSettings,
+    syncJobsNow,
+    runAutoApply
 } = require("../controllers/autoApplyController");
 
 const router = express.Router();
@@ -21,6 +23,8 @@ router.use(authenticateToken);
 
 router.get("/overview", getOverview);
 router.get("/jobs", getMatchingJobs);
+router.post("/sync", syncJobsNow);
+router.post("/auto-run", runAutoApply);
 router.get("/queue", getQueue);
 router.post("/prepare", prepareApplication);
 router.post("/:id/approve", approveApplication);

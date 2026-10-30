@@ -345,4 +345,44 @@ describe("CareerOS Auto Apply & Integration Engine Test Suite", () => {
         const res = await request("POST", `/api/v1/auto-apply/${targetId}/submit`, null, user2Token);
         assert.equal(res.status, 404, "User 2 should receive 404 for User 1's application");
     });
+
+    // 11. Live Feed Synchronization Trigger
+    test("Auto Apply: POST /sync triggers live job feed synchronization", async () => {
+        const res = await request("POST", "/api/v1/auto-apply/sync", {}, user1Token);
+        assert.equal(res.status, 200);
+        assert.ok(res.body.data);
+    });
+
+    // 12. Auto-Run Automation Engine
+    test("Auto Apply: POST /auto-run automatically matches and processes applications", async () => {
+        // Give User 2 relevant skills
+        await User.findByIdAndUpdate(user2Id, {
+            skills: ["aws", "docker", "kubernetes", "terraform"],
+            experienceYears: 3
+        });
+
+        // Create an unapplied job that matches user2
+        const jobForUser2 = await Job.create({
+            title: "DevOps Platform Engineer",
+            role: "DevOps Engineer",
+            company: "CloudScale Systems",
+            location: "Remote",
+            workType: "Remote",
+            source: "greenhouse",
+            sourceUrl: "https://boards.greenhouse.io/cloudscale/jobs/505",
+            description: "Deploy and scale Kubernetes and AWS cloud infrastructure.",
+            skills: ["aws", "docker", "kubernetes", "terraform"],
+            requirements: ["AWS", "Kubernetes"]
+        });
+
+        // Set requireApproval=false on user2 for automatic submission
+        await request("PATCH", "/api/v1/auto-apply/settings", {
+            requireApproval: false,
+            minMatchScore: 50
+        }, user2Token);
+
+        const runRes = await request("POST", "/api/v1/auto-apply/auto-run", {}, user2Token);
+        assert.equal(runRes.status, 200);
+        assert.ok(runRes.body.data.processedCount >= 1);
+    });
 });

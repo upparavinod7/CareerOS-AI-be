@@ -5,6 +5,7 @@ const AutoApplySettings = require("../models/AutoApplySettings");
 const { evaluateJobFit } = require("../utils/aiEngine");
 const { prepareApplicationPackage } = require("../utils/applicationPreparer");
 const { getProvider } = require("../applicationProviders");
+const { syncPublicJobs } = require("../utils/jobFeedService");
 
 /**
  * Helper to retrieve or create default auto-apply settings
@@ -80,6 +81,16 @@ async function getMatchingJobs(req, res, next) {
         const userId = req.user._id;
         const user = await User.findById(userId);
         const settings = await getOrCreateSettings(userId);
+
+        // Ensure real jobs are synchronized if database is empty or explicitly requested
+        if (req.query.sync === "true" || (await Job.countDocuments()) < 5) {
+            try {
+                await syncPublicJobs();
+            } catch (syncErr) {
+                // Non-blocking sync notice
+                console.warn("[AutoApply] Job sync notice:", syncErr.message);
+            }
+        }
 
         // Fetch existing applications to flag duplicates
         const existingApps = await Application.find({ user: userId }).select("job status appliedAt");
@@ -546,6 +557,193 @@ async function updateSettings(req, res, next) {
     }
 }
 
+/**
+ * POST /api/v1/auto-apply/sync
+ * Manually triggers synchronization with real-world job feeds (Adzuna, JSearch, Remotive, Arbeitnow)
+ */
+async function syncJobsNow(req, res, next) {
+    try {
+        const stats = await syncPublicJobs();
+        return res.json({
+            success: true,
+            message: "Live job feeds synchronized successfully.",
+            data: stats
+        });
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
+ * POST /api/v1/auto-apply/auto-run
+ * Automatically executes the auto-apply agent:
+ * - Syncs real jobs if needed
+ * - Finds matching vacancies (> minMatchScore)
+ * - Automatically prepares and applies up to daily target
+ */
+async function runAutoApply(req, res, next) {
+    try {
+        const userId = req.user._id;
+        const [user, settings] = await Promise.all([
+            User.findById(userId),
+            getOrCreateSettings(userId)
+        ]);
+
+        if (settings.isPaused) {
+            return res.status(400).json({
+                success: false,
+                message: "Auto Apply agent is currently paused. Please resume it in settings."
+            });
+        }
+
+        if (!settings.canSubmitToday()) {
+            return res.status(429).json({
+                success: false,
+                message: `Daily submission target of ${settings.dailyApplicationTarget} applications reached for today. Resets tomorrow.`
+            });
+        }
+
+        // Pull fresh live jobs if database has few listings
+        const totalJobs = await Job.countDocuments();
+        if (totalJobs < 5) {
+            await syncPublicJobs().catch(() => {});
+        }
+
+        // Fetch existing applications to prevent duplicate attempts
+        const existingApps = await Application.find({ user: userId }).select("job status");
+        const appliedJobSet = new Set(existingApps.map(a => String(a.job)).filter(Boolean));
+
+        const query = {};
+        if (settings.remoteOnly) query.workType = "Remote";
+
+        const jobs = await Job.find(query).limit(100).lean();
+        const candidateMatches = [];
+
+        for (const job of jobs) {
+            if (appliedJobSet.has(String(job._id))) continue;
+
+            if (settings.excludedCompanies && settings.excludedCompanies.length > 0) {
+                const excluded = settings.excludedCompanies.some(c =>
+                    c.toLowerCase() === (job.company || "").toLowerCase()
+                );
+                if (excluded) continue;
+            }
+
+            const fit = evaluateJobFit(user, job);
+            if (fit.score >= (settings.minMatchScore || 65)) {
+                candidateMatches.push({ job, fitScore: fit.score });
+            }
+        }
+
+        // Rank by highest match score first
+        candidateMatches.sort((a, b) => b.fitScore - a.fitScore);
+
+        let submittedDirectCount = 0;
+        let queuedCount = 0;
+        const processedApps = [];
+
+        for (const item of candidateMatches) {
+            if (!settings.canSubmitToday()) {
+                break; // Reached daily target
+            }
+
+            const { job, fitScore } = item;
+            const prep = await prepareApplicationPackage(user, job);
+            const provider = getProvider(job.source || job.sourceUrl || job.title);
+            const capabilities = provider.getCapabilities();
+
+            // Auto-submit direct or prepare in queue
+            const canDirectSubmit = !settings.requireApproval && capabilities.applicationSubmission && capabilities.submissionMethod === "direct";
+
+            let status = "Awaiting Approval";
+            let providerConfirmation = { confirmationId: null, responseMessage: "", submittedAt: null };
+            let appliedAt = null;
+
+            if (canDirectSubmit) {
+                try {
+                    const submitResult = await provider.submitDirect({
+                        candidateName: user.name,
+                        candidateEmail: user.email,
+                        candidatePhone: user.phone,
+                        resumeSnapshot: prep.selectedResume.snapshot,
+                        coverLetter: prep.coverLetter,
+                        questionAnswers: prep.questionAnswers,
+                        jobId: job._id
+                    });
+                    status = "Submitted";
+                    providerConfirmation = {
+                        confirmationId: submitResult.confirmationId,
+                        responseMessage: "Direct automated application submitted via platform API.",
+                        submittedAt: new Date()
+                    };
+                    appliedAt = new Date();
+                    settings.recordSubmission();
+                    submittedDirectCount++;
+                } catch {
+                    status = "Awaiting Approval";
+                    queuedCount++;
+                }
+            } else {
+                status = settings.requireApproval ? "Awaiting Approval" : "Ready to Submit";
+                queuedCount++;
+            }
+
+            const application = new Application({
+                user: userId,
+                job: job._id,
+                company: job.company,
+                jobTitle: job.title,
+                location: job.location,
+                salary: job.salary ? `${job.salary.min || ""} - ${job.salary.max || ""}` : "",
+                jobUrl: job.sourceUrl || "",
+                status: status,
+                platform: provider.name,
+                submissionMethod: capabilities.submissionMethod,
+                resumeVersionId: prep.selectedResume.resumeId,
+                resumeTitle: prep.selectedResume.title,
+                resumeSnapshot: prep.selectedResume.snapshot,
+                coverLetter: prep.coverLetter,
+                questionAnswers: prep.questionAnswers,
+                matchScore: prep.matchScore || fitScore,
+                matchingSkills: prep.matchingSkills,
+                missingSkills: prep.missingSkills,
+                eligibilityConcerns: prep.eligibilityConcerns,
+                approvalRecord: {
+                    approved: !settings.requireApproval,
+                    approvedAt: !settings.requireApproval ? new Date() : null,
+                    notes: !settings.requireApproval ? "Auto-approved by automation configuration" : ""
+                },
+                providerConfirmation,
+                appliedAt
+            });
+
+            await application.save();
+            appliedJobSet.add(String(job._id));
+            processedApps.push(application);
+        }
+
+        await settings.save();
+
+        return res.json({
+            success: true,
+            message: `Automated processing completed: ${submittedDirectCount} submitted directly via API, ${queuedCount} prepared in queue.`,
+            data: {
+                processedCount: processedApps.length,
+                submittedDirectCount,
+                queuedCount,
+                dailyProgress: {
+                    submittedToday: settings.dailySubmittedCount,
+                    dailyTarget: settings.dailyApplicationTarget,
+                    canSubmitMore: settings.canSubmitToday()
+                },
+                applications: processedApps
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+}
+
 module.exports = {
     getOverview,
     getMatchingJobs,
@@ -558,5 +756,7 @@ module.exports = {
     rejectApplication,
     getHistory,
     getSettings,
-    updateSettings
+    updateSettings,
+    syncJobsNow,
+    runAutoApply
 };
