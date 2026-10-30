@@ -13,11 +13,21 @@ const {
     getSavedCoverLetters,
     chatMockInterview
 } = require("../controllers/aiController");
+const resumeIntelligence = require("../controllers/resumeIntelligenceController");
 const { auth } = require("../middleware/auth");
 
 const router = express.Router();
 
 router.use(auth);
+
+// Production AI Resume Intelligence & ATS Engine
+router.post("/resume/parse", resumeIntelligence.parseResume);
+router.post("/resume/quality-check", resumeIntelligence.qualityCheck);
+router.post("/resume/ats-score", resumeIntelligence.scoreATS);
+router.post("/resume/optimize", resumeIntelligence.optimize);
+router.post("/resume/generate-pdf", resumeIntelligence.generatePDF);
+router.post("/resume/validate-pdf", resumeIntelligence.validatePDF);
+router.get("/resume/saved", resumeIntelligence.getSavedResumes);
 
 // Fit Analysis
 router.post("/fit", analyzeFit);

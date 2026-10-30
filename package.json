@@ -7,7 +7,9 @@
     "dev": "nodemon index.js",
     "start": "node index.js",
     "seed:jobs": "node scripts/seedJobs.js",
-    "test": "node --test --test-concurrency=1 tests/api.test.js tests/autoApply.test.js"
+    "test": "node --test --test-concurrency=1 tests/api.test.js tests/autoApply.test.js tests/resumeIntelligence.test.js",
+    "start:ai": "cd ai-service && PYTHONPATH=. venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001",
+    "test:ai": "cd ai-service && PYTHONPATH=. venv/bin/pytest tests/ -v"
   },
   "keywords": [
     "careeros",

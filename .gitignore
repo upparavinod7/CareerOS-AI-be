@@ -31,3 +31,23 @@ Thumbs.db
 # Cache
 .cache/
 .next/
+
+# Python Virtual Environments and Caches
+venv/
+*/venv/
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*/.pytest_cache/
+
+# Python Virtual Environments and Caches
+venv/
+*/venv/
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*/.pytest_cache/

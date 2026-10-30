@@ -8,10 +8,20 @@ CareerOS AI backend provides secure authentication, job ingestion & synchronizat
 
 ```
 CareerOs-AI-be/
+├── ai-service/               # Python FastAPI AI Resume Intelligence Microservice
+│   ├── app/
+│   │   ├── api/routes/       # Endpoints: /parse, /quality-check, /ats/score, /optimization, /pdf
+│   │   ├── core/             # Configuration & internal security key verification
+│   │   ├── knowledge_base/   # Skill taxonomy, Google XYZ formula, action verbs
+│   │   ├── schemas/          # Pydantic models for StructuredResume, ATS, JobDescription
+│   │   └── services/         # PyMuPDF, DOCX, ATS Scorer, Quality Checker, Optimizer, ReportLab
+│   ├── tests/                # Pytest unit & integration test suite (12 tests)
+│   └── requirements.txt      # Python dependencies
 ├── config/
 │   └── db.js                 # MongoDB connection with in-memory dev fallback & prod guardrails
 ├── controllers/
 │   ├── aiController.js       # AI fit, roadmap, prediction, ATS, interview, & cover letter
+│   ├── resumeIntelligenceController.js # AI Resume Intelligence & PDF compilation orchestrator
 │   ├── applicationController.js # Kanban & table application tracker CRUD
 │   ├── authController.js     # User registration, bcrypt password hashing, JWT generation
 │   ├── dashboardController.js# Real-time analytics, pipeline velocity, & activity timeline
@@ -23,6 +33,7 @@ CareerOs-AI-be/
 │   └── security.js           # CSP, X-Frame, XSS headers, & IP rate limiting
 ├── models/
 │   ├── Application.js        # Tracked job applications & interview schedules
+│   ├── ResumeIntelligence.js # Parsed structured resumes, ATS scorecards, & PDF validations
 │   ├── CoverLetter.js        # Saved tailored cover letters
 │   ├── FitAnalysis.js        # Persistent AI job-fit match scores & competency breakdowns
 │   ├── InterviewPrep.js      # Interview questions & mock chat transcripts
@@ -30,8 +41,12 @@ CareerOs-AI-be/
 │   ├── Roadmap.js            # Multi-week structured learning roadmaps with completion state
 │   └── User.js               # User accounts, skills, resume context, & profile readiness
 ├── routes/                   # Mounted under /api/v1/*
+├── services/
+│   └── aiServiceClient.js   # HTTP client forwarding requests to Python AI Microservice
 ├── tests/
-│   └── api.test.js           # Automated end-to-end integration test suite (24 tests)
+│   ├── api.test.js           # Express API integration tests
+│   ├── autoApply.test.js     # Multi-platform Auto Apply & integration tests
+│   └── resumeIntelligence.test.js # AI Resume Intelligence test suite
 ├── utils/
 │   ├── aiEngine.js           # Explainable scoring, role predictor, roadmap, ATS, & mock AI
 │   ├── jobFeedService.js     # External job feed synchronization (Remotive, Arbeitnow)
@@ -97,7 +112,17 @@ npm start
 
 ### Execute Automated Test Suite
 ```bash
+# Node.js backend integration test suite (44 tests)
 npm test
+
+# Python AI microservice test suite (12 tests)
+npm run test:ai
+```
+
+### Run Python AI Microservice
+```bash
+# Run FastAPI service on port 8001
+npm run start:ai
 ```
 *Executes 24 automated integration tests verifying health, auth, protected routes, job saving, AI fit, roadmap milestone completion, cover letters, mock interview evaluation, and application tracker CRUD.*
 
