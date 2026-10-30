@@ -7,14 +7,14 @@
     "dev": "nodemon index.js",
     "start": "node index.js",
     "seed:jobs": "node scripts/seedJobs.js",
-    "test": "echo \"No tests configured\""
+    "test": "node --test tests/api.test.js"
   },
   "keywords": [
     "careeros",
     "jobs",
     "ai"
   ],
-  "author": "",
+  "author": "Uppara Vinod",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {

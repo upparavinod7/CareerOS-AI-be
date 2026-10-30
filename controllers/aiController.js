@@ -1,255 +1,366 @@
 const Job = require("../models/Job");
 const FitAnalysis = require("../models/FitAnalysis");
+const Roadmap = require("../models/Roadmap");
+const CoverLetter = require("../models/CoverLetter");
+const InterviewPrep = require("../models/InterviewPrep");
+const User = require("../models/User");
 const {
     calculateFitScore,
     extractKeywords,
+    predictCareerRoles,
     generateRoadmap,
     suggestResumeImprovements,
+    generateCoverLetterDraft,
+    generateInterviewGuidance,
+    evaluateInterviewAnswer,
     roleSkillMap,
     resolveRoleProfile
 } = require("../utils/aiEngine");
 
+// 1. Analyze fit against specific Job ID
 exports.analyzeFit = async (req, res, next) => {
     try {
         const { jobId, skills = [], resumeText = "", experienceYears = 0 } = req.body;
 
         const job = await Job.findById(jobId);
         if (!job) {
-            return res.status(404).json({ error: "Job not found" });
+            return res.status(404).json({ success: false, error: "Job not found" });
         }
 
         const resumeKeywords = extractKeywords(resumeText);
         const mergedSkills = Array.from(new Set([...skills, ...resumeKeywords]));
 
-        const fit = calculateFitScore(job.skills, mergedSkills);
-        const experienceBoost = Math.min(10, Number(experienceYears) * 1.5);
-        const finalScore = Math.min(100, fit.matchPercentage + Math.round(experienceBoost));
+        const fit = calculateFitScore(job.skills, mergedSkills, experienceYears, resumeText);
 
-        const suggestions = [...fit.suggestions];
-        if (finalScore < 60) {
-            suggestions.push("Prioritize one project aligned to the top 3 missing skills before applying.");
-        }
-
-        await FitAnalysis.create({
+        const record = await FitAnalysis.create({
             user: req.user._id,
-            role: job.role,
-            fitScore: finalScore,
+            job: job._id,
+            role: job.role || job.title,
+            fitScore: fit.matchPercentage,
             strongSkills: fit.strongSkills,
             missingSkills: fit.missingSkills,
-            suggestions
+            partiallyMatchingSkills: fit.partiallyMatchingSkills,
+            suggestions: fit.suggestions,
+            categoryScores: fit.categories,
+            keywordCoverage: fit.keywordCoverage,
+            experienceAlignment: fit.experienceAlignment
         });
 
         res.json({
+            success: true,
+            id: record._id,
             job: {
                 id: job._id,
                 title: job.title,
                 company: job.company,
-                role: job.role
-             },
-            matchPercentage: finalScore,
+                role: job.role,
+                location: job.location
+            },
+            matchPercentage: fit.matchPercentage,
             strongSkills: fit.strongSkills,
+            partiallyMatchingSkills: fit.partiallyMatchingSkills,
             missingSkills: fit.missingSkills,
-            suggestions,
-            categories: [
-                { subject: 'Frontend', score: fit.strongSkills.some(s => ['react', 'html', 'css', 'javascript', 'typescript'].includes(s)) ? 90 : 30 },
-                { subject: 'Backend', score: fit.strongSkills.some(s => ['node', 'express', 'python', 'database'].includes(s)) ? 85 : 40 },
-                { subject: 'DevOps', score: fit.strongSkills.some(s => ['docker', 'aws', 'kubernetes'].includes(s)) ? 75 : 20 },
-                { subject: 'Data', score: fit.strongSkills.some(s => ['sql', 'statistics', 'ml', 'python'].includes(s)) ? 80 : 35 },
-                { subject: 'System Design', score: fit.strongSkills.some(s => ['system_design', 'microservices'].includes(s)) ? 70 : 45 },
-                { subject: 'Testing', score: fit.strongSkills.some(s => ['testing'].includes(s)) ? 85 : 50 }
-            ]
+            keywordCoverage: fit.keywordCoverage,
+            experienceAlignment: fit.experienceAlignment,
+            suggestions: fit.suggestions,
+            categories: fit.categories
         });
     } catch (error) {
         next(error);
     }
 };
 
+// 2. Analyze fit against target Role title
 exports.analyzeRoleFit = async (req, res, next) => {
     try {
         const { role = "", skills = [], resumeText = "", experienceYears = 0 } = req.body;
 
         if (!role.trim()) {
-            return res.status(400).json({ error: "role is required" });
+            return res.status(400).json({ success: false, error: "Role is required" });
         }
 
         const { resolvedRole, confidence } = resolveRoleProfile(role);
-        const profile = roleSkillMap[resolvedRole] || roleSkillMap["Backend Developer"];
+        const profile = roleSkillMap[resolvedRole] || roleSkillMap["Full Stack Developer"];
         const requiredSkills = [...profile.beginner, ...profile.intermediate, ...profile.advanced];
 
         const resumeKeywords = extractKeywords(resumeText);
         const mergedSkills = Array.from(new Set([...skills, ...resumeKeywords]));
 
-        const fit = calculateFitScore(requiredSkills, mergedSkills);
-        const experienceBoost = Math.min(10, Number(experienceYears) * 1.5);
-        const finalScore = Math.min(100, fit.matchPercentage + Math.round(experienceBoost));
+        const fit = calculateFitScore(requiredSkills, mergedSkills, experienceYears, resumeText);
 
-        const suggestions = [...fit.suggestions];
-        if (finalScore < 60) {
-            suggestions.push("Prioritize one role-specific project for your top 3 missing skills.");
-        }
-        if (confidence < 1) {
-            suggestions.push(`Role interpreted as ${resolvedRole}. Refine role title for tighter analysis.`);
-        }
-
-        await FitAnalysis.create({
+        const record = await FitAnalysis.create({
             user: req.user._id,
             role: resolvedRole,
-            fitScore: finalScore,
+            fitScore: fit.matchPercentage,
             strongSkills: fit.strongSkills,
             missingSkills: fit.missingSkills,
-            suggestions
+            partiallyMatchingSkills: fit.partiallyMatchingSkills,
+            suggestions: fit.suggestions,
+            categoryScores: fit.categories,
+            keywordCoverage: fit.keywordCoverage,
+            experienceAlignment: fit.experienceAlignment
         });
 
         res.json({
+            success: true,
+            id: record._id,
             targetRole: role,
             resolvedRole,
             roleMatchConfidence: confidence,
             requiredSkills,
-            matchPercentage: finalScore,
+            matchPercentage: fit.matchPercentage,
             strongSkills: fit.strongSkills,
+            partiallyMatchingSkills: fit.partiallyMatchingSkills,
             missingSkills: fit.missingSkills,
-            suggestions,
-            categories: [
-                { subject: 'Frontend', score: fit.strongSkills.some(s => ['react', 'html', 'css', 'javascript', 'typescript'].includes(s)) ? 95 : 30 },
-                { subject: 'Backend', score: fit.strongSkills.some(s => ['node', 'express', 'python', 'database'].includes(s)) ? 80 : 40 },
-                { subject: 'DevOps', score: fit.strongSkills.some(s => ['docker', 'aws', 'kubernetes'].includes(s)) ? 70 : 20 },
-                { subject: 'Data', score: fit.strongSkills.some(s => ['sql', 'statistics', 'ml', 'python'].includes(s)) ? 85 : 35 },
-                { subject: 'System Design', score: fit.strongSkills.some(s => ['system_design', 'microservices'].includes(s)) ? 75 : 45 },
-                { subject: 'Testing', score: fit.strongSkills.some(s => ['testing'].includes(s)) ? 60 : 50 }
-            ]
+            keywordCoverage: fit.keywordCoverage,
+            experienceAlignment: fit.experienceAlignment,
+            suggestions: fit.suggestions,
+            categories: fit.categories
         });
     } catch (error) {
         next(error);
     }
 };
 
-exports.createRoadmap = async (req, res, next) => {
+// 3. Get Fit Analysis History
+exports.getFitHistory = async (req, res, next) => {
     try {
-        const { role, hoursPerDay, months } = req.body;
+        const history = await FitAnalysis.find({ user: req.user._id })
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .populate("job", "title company location");
 
-        if (!role || !hoursPerDay || !months) {
-            return res.status(400).json({ error: "role, hoursPerDay and months are required" });
-        }
-
-        const roadmap = generateRoadmap(role, Number(hoursPerDay), Number(months));
-        res.json(roadmap);
+        res.json({
+            success: true,
+            history
+        });
     } catch (error) {
         next(error);
     }
 };
 
+// 4. Career Predictor (Phase 4.5)
+exports.predictCareer = async (req, res, next) => {
+    try {
+        const {
+            skills = [],
+            experienceYears = 0,
+            education = "",
+            interests = [],
+            targetAreas = []
+        } = req.body;
+
+        const result = predictCareerRoles({
+            skills,
+            experienceYears,
+            education,
+            interests,
+            targetAreas
+        });
+
+        res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 5. Generate Roadmap (Phase 4.6)
+exports.createRoadmap = async (req, res, next) => {
+    try {
+        const { role, hoursPerDay = 2, months = 3, currentLevel = "Beginner" } = req.body;
+
+        if (!role || !role.trim()) {
+            return res.status(400).json({ success: false, error: "Target role is required" });
+        }
+
+        const roadmapData = generateRoadmap(role, hoursPerDay, months, currentLevel);
+
+        // Automatically save roadmap for the user so it persists
+        const savedRoadmap = await Roadmap.create({
+            user: req.user._id,
+            ...roadmapData
+        });
+
+        res.json({
+            success: true,
+            message: "Roadmap generated and saved successfully",
+            roadmap: savedRoadmap,
+            ...savedRoadmap.toObject()
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 6. Get Saved Roadmaps
+exports.getRoadmaps = async (req, res, next) => {
+    try {
+        const roadmaps = await Roadmap.find({ user: req.user._id }).sort({ updatedAt: -1 });
+        res.json({
+            success: true,
+            items: roadmaps
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 7. Toggle Roadmap Task Completed
+exports.toggleRoadmapTask = async (req, res, next) => {
+    try {
+        const { roadmapId, taskId } = req.params;
+
+        const roadmap = await Roadmap.findOne({ _id: roadmapId, user: req.user._id });
+        if (!roadmap) {
+            return res.status(404).json({ success: false, error: "Roadmap not found" });
+        }
+
+        const task = roadmap.weeklyPlan.id(taskId);
+        if (!task) {
+            return res.status(404).json({ success: false, error: "Task not found" });
+        }
+
+        task.completed = !task.completed;
+        task.completedAt = task.completed ? new Date() : null;
+        roadmap.updateProgress();
+        await roadmap.save();
+
+        res.json({
+            success: true,
+            message: task.completed ? "Task marked complete" : "Task marked incomplete",
+            task,
+            progressPercentage: roadmap.progressPercentage
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 8. Resume Optimizer & ATS Analyzer (Phase 4.7)
 exports.optimizeResume = async (req, res, next) => {
     try {
         const { resumeText, role } = req.body;
 
         if (!resumeText || !role) {
-            return res.status(400).json({ error: "resumeText and role are required" });
+            return res.status(400).json({ success: false, error: "resumeText and role are required" });
         }
 
         const output = suggestResumeImprovements(resumeText, role);
-        res.json(output);
+        res.json({
+            success: true,
+            ...output
+        });
     } catch (error) {
         next(error);
     }
 };
 
+// 9. Interview Guidance (Phase 4.9)
 exports.interviewGuidance = async (req, res, next) => {
     try {
-        const { role, focusSkills = [] } = req.body;
+        const { role, focusSkills = [], difficulty = "Intermediate" } = req.body;
 
-        const guidance = {
-            role,
-            technical: focusSkills.slice(0, 5).map(skill => `Prepare one deep-dive answer on ${skill}`),
-            behavioral: [
-                "Use STAR format for leadership and conflict stories.",
-                "Quantify outcomes when discussing project impact.",
-                "Prepare one failure story with concrete learning."
-            ],
-            mockPlan: [
-                "Day 1: System/architecture round rehearsal",
-                "Day 2: Coding + debugging drills",
-                "Day 3: Behavioral mock and resume walkthrough"
-            ]
-        };
+        if (!role || !role.trim()) {
+            return res.status(400).json({ success: false, error: "Role is required" });
+        }
 
-        res.json(guidance);
+        const guidance = generateInterviewGuidance(role, focusSkills, difficulty);
+        res.json({
+            success: true,
+            ...guidance,
+            // maintain legacy flat format compatibility:
+            technical: guidance.technicalQuestions,
+            behavioral: guidance.behavioralQuestions,
+            mockPlan: guidance.mockPlan
+        });
     } catch (error) {
         next(error);
     }
 };
 
-exports.generateCoverLetter = async (req, res, next) => {
-    try {
-        const { role, companyName, jobDescription, resumeText } = req.body;
-
-        if (!role || !companyName) {
-             return res.status(400).json({ error: "role and companyName are required" });
-        }
-
-        const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        
-        let coverLetter = `${date}\n\nHiring Manager\n${companyName}\n\nDear Hiring Manager,\n\nI am writing to express my strong interest in the ${role} position at ${companyName}. `;
-        
-        if (resumeText.length > 50) {
-            coverLetter += `With my background matching the core requirements, I have developed a strong foundation in the skills necessary to succeed in this role. `;
-        } else {
-             coverLetter += `I am eager to bring my dedication, fast learning capabilities, and passion to your team. `;
-        }
-        
-        if (jobDescription && jobDescription.length > 20) {
-            coverLetter += `Your focus on innovation and the specific challenges outlined in the job description align perfectly with my career goals.\n\n`;
-        } else {
-            coverLetter += `I greatly admire ${companyName}'s work and would be thrilled to contribute to your ongoing success.\n\n`;
-        }
-
-        coverLetter += `Throughout my career, I have consistently focused on delivering high-quality results and collaborating effectively with cross-functional teams. I am confident that my technical skills and proactive mindset make me a strong candidate for this position.\n\nI would welcome the opportunity to further discuss how my background, skills, and certifications will be beneficial to ${companyName}. Thank you for your time and consideration.\n\nSincerely,\n\n[Your Name]\n[Your Contact Information]`;
-
-        // Simulate network delay to make the loader visible on the frontend
-        await new Promise(r => setTimeout(r, 1500));
-
-        res.json({ coverLetter });
-    } catch (error) {
-        next(error);
-    }
-};
-
+// 10. Chat Mock Interview (Phase 4.9)
 exports.chatMockInterview = async (req, res, next) => {
     try {
-        const { role, messageHistory, currentAnswer } = req.body;
+        const { role, messageHistory = [], currentAnswer = "" } = req.body;
 
-        if (!role) {
-             return res.status(400).json({ error: "role is required" });
+        if (!role || !role.trim()) {
+            return res.status(400).json({ success: false, error: "Role is required" });
         }
 
-        // Simulate network delay to emulate LLM reasoning
-        await new Promise(r => setTimeout(r, 1500));
-
-        // If simple greeting or opening
         if (!messageHistory || messageHistory.length === 0) {
-             return res.json({
-                 reply: `Hello! Let's start your mock interview for the ${role} position. Could you briefly walk me through your background and why you are interested in this role?`,
-                 score: null
-             });
+            return res.json({
+                success: true,
+                reply: `Hello! Welcome to your mock interview for the ${role} position. Let's begin: Could you briefly walk me through your technical background and what makes you interested in this role?`,
+                score: null,
+                feedback: null
+            });
         }
 
-        // Extremely naive mock grading for the purpose of this demonstration
-        const wordCount = (currentAnswer || "").split(/\s+/).length;
-        let score = null;
-        let reply = "";
+        const lastAiQuestion = messageHistory
+            .slice()
+            .reverse()
+            .find(m => m.role === "ai" || m.role === "assistant")?.content || "";
 
-        if (wordCount < 10) {
-            score = 3;
-            reply = "That's a bit brief. In a real interview, you'll want to expand on that significantly. Let's try another question: Can you describe a time you overcame a difficult technical challenge?";
-        } else if (wordCount < 40) {
-            score = 6;
-            reply = "Good start, but you could provide more specific details or use the STAR method to structure your answer. Next question: How do you prioritize tasks when under a tight deadline?";
-        } else {
-            score = 9;
-            reply = "Excellent answer. You provided good detail and structured your response well. Let's move on: Where do you see your career heading in the next 3 to 5 years?";
+        const evaluation = evaluateInterviewAnswer(role, currentAnswer, lastAiQuestion);
+
+        res.json({
+            success: true,
+            reply: evaluation.reply,
+            score: evaluation.score,
+            feedback: evaluation.feedback
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 11. Generate Cover Letter (Phase 4.8)
+exports.generateCoverLetter = async (req, res, next) => {
+    try {
+        const { role, companyName, jobDescription, resumeText, tone = "Professional" } = req.body;
+
+        if (!role || !companyName) {
+            return res.status(400).json({ success: false, error: "Role and company name are required" });
         }
 
-        res.json({ reply, score });
+        const coverLetter = generateCoverLetterDraft({
+            role,
+            companyName,
+            jobDescription,
+            resumeText,
+            tone
+        });
 
+        // Save cover letter
+        await CoverLetter.create({
+            user: req.user._id,
+            role,
+            companyName,
+            jobDescription,
+            tone,
+            content: coverLetter
+        });
+
+        res.json({
+            success: true,
+            coverLetter
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 12. Get Saved Cover Letters
+exports.getSavedCoverLetters = async (req, res, next) => {
+    try {
+        const letters = await CoverLetter.find({ user: req.user._id }).sort({ createdAt: -1 });
+        res.json({
+            success: true,
+            items: letters
+        });
     } catch (error) {
         next(error);
     }

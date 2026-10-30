@@ -1,10 +1,10 @@
-# CareerOS AI – Setup Guide
+# CareerOS AI ï¿½ Setup Guide
 
 Full-stack AI-powered career platform (Node/Express/MongoDB + Vite/React/TS + Tailwind + Recharts/Framer Motion).
 
 ## Monorepo layout
-- `server/` — Express API (auth, jobs, AI analyzers, roadmap, dashboard).
-- `AI SKILL AND ROLE PREDICT/` — Vite + React + TypeScript frontend.
+- `server/` ï¿½ Express API (auth, jobs, AI analyzers, roadmap, dashboard).
+- `AI SKILL AND ROLE PREDICT/` ï¿½ Vite + React + TypeScript frontend.
 
 ## Prerequisites
 - Node.js 18+ (tested with 18/20/22/24)
@@ -28,7 +28,7 @@ npm install
 ```
 Create `.env` (you can copy `.env.example` and adjust):
 ```
-PORT=5001
+PORT=5000
 NODE_ENV=development
 MONGO_URI=mongodb://127.0.0.1:27017/careeros_ai
 MONGO_DB_NAME=careeros_ai
@@ -71,7 +71,7 @@ npm run seed:jobs
 ```
 
 ## Common commands
-- Backend lint/tests: (not configured) — placeholder.
+- Backend lint/tests: (not configured) ï¿½ placeholder.
 - Frontend build: `npm run build` inside frontend directory.
 
 ## Troubleshooting
@@ -95,6 +95,6 @@ npm run seed:jobs
 - `GET/POST/PATCH /applications`
 
 ## Frontend credentials storage
-- JWT is stored in `localStorage` under `careeros_token`. Use the app’s Login/Register to obtain a token after backend is running.
+- JWT is stored in `localStorage` under `careeros_token`. Use the appï¿½s Login/Register to obtain a token after backend is running.
 
 Enjoy building on CareerOS AI.

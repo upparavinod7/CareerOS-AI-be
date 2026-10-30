@@ -1,11 +1,11 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 
-const { connectDB } = require("../config/db");
+const { connectDBWithRetry } = require("../config/db");
 const Job = require("../models/Job");
 const { mockJobs } = require("../utils/mockJobs");
 
 async function seed() {
-    await connectDB();
+    await connectDBWithRetry();
 
     const operations = mockJobs.map(job => ({
         updateOne: {
@@ -15,12 +15,12 @@ async function seed() {
         }
     }));
 
-    await Job.bulkWrite(operations);
-    console.log(`Seeded ${mockJobs.length} jobs`);
+    const result = await Job.bulkWrite(operations);
+    console.log(`[Seed] Seeded ${mockJobs.length} jobs successfully (${result.upsertedCount} inserted, ${result.modifiedCount} updated).`);
     process.exit(0);
 }
 
 seed().catch(error => {
-    console.error(error);
+    console.error("[Seed Error]", error);
     process.exit(1);
 });

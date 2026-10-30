@@ -1,4 +1,4 @@
-﻿const bcrypt = require("bcryptjs");
+const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const { signToken } = require("../utils/token");
 const { isDatabaseConnected } = require("../config/db");
@@ -25,11 +25,12 @@ function isDatabaseUnavailable(error) {
 function ensureDbReady(res) {
     if (!isDatabaseConnected()) {
         res.status(503).json({
-            error: "Database unavailable. Start MongoDB and retry."
+            success: false,
+            error: "Database unavailable. Start MongoDB and retry.",
+            message: "Database unavailable. Start MongoDB and retry."
         });
         return false;
     }
-
     return true;
 }
 
@@ -43,20 +44,36 @@ exports.register = async (req, res, next) => {
         const password = String(body.password || "");
 
         if (!name || !email || !password) {
-            return res.status(400).json({ error: "name, email and password are required" });
+            return res.status(400).json({
+                success: false,
+                error: "Name, email and password are required.",
+                message: "Name, email and password are required."
+            });
         }
 
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            return res.status(400).json({ error: "Enter a valid email address" });
+            return res.status(400).json({
+                success: false,
+                error: "Please enter a valid email address.",
+                message: "Please enter a valid email address."
+            });
         }
 
         if (password.length < 6) {
-            return res.status(400).json({ error: "Password must be at least 6 characters" });
+            return res.status(400).json({
+                success: false,
+                error: "Password must be at least 6 characters long.",
+                message: "Password must be at least 6 characters long."
+            });
         }
 
         const existing = await User.findOne({ email });
         if (existing) {
-            return res.status(409).json({ error: "Email already registered" });
+            return res.status(409).json({
+                success: false,
+                error: "An account with this email already exists.",
+                message: "An account with this email already exists."
+            });
         }
 
         const hashed = await bcrypt.hash(password, 10);
@@ -64,32 +81,51 @@ exports.register = async (req, res, next) => {
         const token = signToken(user._id.toString());
 
         return res.status(201).json({
+            success: true,
+            message: "Registration successful",
             token,
             user: {
                 id: user._id,
+                _id: user._id,
                 name: user.name,
                 email: user.email,
+                role: user.role,
                 skills: user.skills,
                 experienceYears: user.experienceYears,
-                targetRole: user.targetRole
+                targetRole: user.targetRole,
+                profileCompletion: user.getProfileCompletion()
             }
         });
     } catch (error) {
         if (isDatabaseUnavailable(error)) {
             return res.status(503).json({
-                error: "Database unavailable. Start MongoDB and retry."
+                success: false,
+                error: "Database unavailable. Start MongoDB and retry.",
+                message: "Database unavailable. Start MongoDB and retry."
             });
         }
 
         if (error?.code === 11000) {
-            return res.status(409).json({ error: "Email already registered" });
+            return res.status(409).json({
+                success: false,
+                error: "An account with this email already exists.",
+                message: "An account with this email already exists."
+            });
         }
 
         if (error?.name === "ValidationError") {
-            return res.status(400).json({ error: "Invalid registration data" });
+            return res.status(400).json({
+                success: false,
+                error: "Invalid registration data",
+                message: error.message
+            });
         }
 
-        return res.status(500).json({ error: "Registration failed unexpectedly" });
+        return res.status(500).json({
+            success: false,
+            error: "Registration failed unexpectedly",
+            message: error.message
+        });
     }
 };
 
@@ -102,39 +138,67 @@ exports.login = async (req, res, next) => {
         const password = String(body.password || "");
 
         if (!email || !password) {
-            return res.status(400).json({ error: "email and password are required" });
+            return res.status(400).json({
+                success: false,
+                error: "Email and password are required.",
+                message: "Email and password are required."
+            });
         }
 
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(401).json({ error: "Invalid credentials" });
+            return res.status(401).json({
+                success: false,
+                error: "Invalid email or password",
+                message: "Invalid email or password"
+            });
         }
 
         const ok = await bcrypt.compare(password, user.password);
         if (!ok) {
-            return res.status(401).json({ error: "Invalid credentials" });
+            return res.status(401).json({
+                success: false,
+                error: "Invalid email or password",
+                message: "Invalid email or password"
+            });
         }
 
         const token = signToken(user._id.toString());
 
         return res.json({
+            success: true,
+            message: "Login successful",
             token,
             user: {
                 id: user._id,
+                _id: user._id,
                 name: user.name,
                 email: user.email,
+                role: user.role,
+                headline: user.headline,
+                bio: user.bio,
                 skills: user.skills,
                 experienceYears: user.experienceYears,
-                targetRole: user.targetRole
+                targetRole: user.targetRole,
+                preferredLocations: user.preferredLocations,
+                preferredWorkType: user.preferredWorkType,
+                resumeText: user.resumeText,
+                profileCompletion: user.getProfileCompletion()
             }
         });
     } catch (error) {
         if (isDatabaseUnavailable(error)) {
             return res.status(503).json({
-                error: "Database unavailable. Start MongoDB and retry."
+                success: false,
+                error: "Database unavailable. Start MongoDB and retry.",
+                message: "Database unavailable. Start MongoDB and retry."
             });
         }
 
-        return res.status(500).json({ error: "Login failed unexpectedly" });
+        return res.status(500).json({
+            success: false,
+            error: "Login failed unexpectedly",
+            message: error.message
+        });
     }
 };

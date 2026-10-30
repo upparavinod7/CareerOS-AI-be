@@ -1,4 +1,4 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 
 const jobSchema = new mongoose.Schema(
     {
@@ -6,6 +6,11 @@ const jobSchema = new mongoose.Schema(
         title: { type: String, required: true, trim: true },
         company: { type: String, required: true, trim: true },
         location: { type: String, required: true, trim: true },
+        workType: {
+            type: String,
+            enum: ["Remote", "Hybrid", "On-site"],
+            default: "Remote"
+        },
         role: { type: String, required: true, trim: true },
         experienceLevel: {
             type: String,
@@ -29,6 +34,6 @@ const jobSchema = new mongoose.Schema(
 );
 
 jobSchema.index({ title: "text", company: "text", description: "text", skills: "text" });
-jobSchema.index({ role: 1, location: 1, experienceLevel: 1, minSalary: 1, maxSalary: 1 });
+jobSchema.index({ role: 1, location: 1, workType: 1, experienceLevel: 1, minSalary: 1, maxSalary: 1, postedAt: -1 });
 
 module.exports = mongoose.model("Job", jobSchema);

@@ -12,7 +12,7 @@ function isDatabaseConnected() {
 async function connectDB() {
     const uri = process.env.MONGO_URI;
     if (!uri) {
-        throw new Error("MONGO_URI is required");
+        throw new Error("MONGO_URI environment variable is required.");
     }
 
     mongoose.set("strictQuery", true);
@@ -23,13 +23,21 @@ async function connectDB() {
     });
 
     databaseMode = "external";
+    console.log(`[Database] Connected to external MongoDB (${process.env.MONGO_DB_NAME || "careeros_ai"})`);
 }
 
 async function startInMemoryMongo() {
+    if (process.env.NODE_ENV === "production") {
+        throw new Error(
+            "[Database] In-memory MongoDB is disabled in production. A persistent MongoDB URI is required."
+        );
+    }
+
     if (memoryServer) {
         return;
     }
 
+    console.warn("[Database] Development mode: Starting in-memory MongoDB fallback server...");
     memoryServer = await MongoMemoryServer.create({
         instance: { dbName: process.env.MONGO_DB_NAME || "careeros_ai" }
     });
@@ -42,44 +50,57 @@ async function startInMemoryMongo() {
     });
 
     databaseMode = "in-memory";
-    console.warn("Using in-memory MongoDB fallback (data resets on restart).");
+    console.warn("⚠️  [Database] Running in-memory MongoDB fallback. Data will reset upon process restart!");
 }
 
 function scheduleReconnect() {
-    if (reconnectTimer) return;
+    if (reconnectTimer || process.env.NODE_ENV === "production") return;
 
     reconnectTimer = setTimeout(async () => {
         reconnectTimer = null;
         try {
             await connectDB();
-            console.log("MongoDB reconnected");
+            console.log("[Database] Reconnected to external MongoDB successfully");
         } catch (error) {
-            console.error("MongoDB reconnect failed:", error.message);
+            console.warn(`[Database] Reconnect attempt failed: ${error.message}`);
             scheduleReconnect();
         }
-    }, 5000);
+    }, 10000);
 }
 
 async function connectDBWithRetry() {
     try {
         await connectDB();
-        console.log("MongoDB connected");
     } catch (error) {
-        console.error("MongoDB initial connect failed:", error.message);
+        console.warn(`[Database] External MongoDB connection failed: ${error.message}`);
+
+        if (process.env.NODE_ENV === "production") {
+            throw error;
+        }
 
         try {
             await startInMemoryMongo();
-            console.log("In-memory MongoDB connected");
         } catch (memoryError) {
-            console.error("In-memory MongoDB fallback failed:", memoryError.message);
+            console.error(`[Database] In-memory MongoDB fallback failed: ${memoryError.message}`);
             scheduleReconnect();
         }
     }
 }
 
+async function disconnectDB() {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    await mongoose.disconnect();
+    if (memoryServer) {
+        await memoryServer.stop();
+        memoryServer = null;
+    }
+    databaseMode = "disconnected";
+}
+
 module.exports = {
     connectDB,
     connectDBWithRetry,
+    disconnectDB,
     isDatabaseConnected,
     getDatabaseMode: () => databaseMode
 };
