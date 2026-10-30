@@ -19,3 +19,4 @@ const coverLetterSchema = new mongoose.Schema(
 coverLetterSchema.index({ user: 1, createdAt: -1 });
 
 module.exports = mongoose.model("CoverLetter", coverLetterSchema);
+

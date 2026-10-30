@@ -31,3 +31,4 @@ const interviewPrepSchema = new mongoose.Schema(
 interviewPrepSchema.index({ user: 1, createdAt: -1 });
 
 module.exports = mongoose.model("InterviewPrep", interviewPrepSchema);
+

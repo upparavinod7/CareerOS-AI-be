@@ -474,3 +474,4 @@ test("Career Dashboard - provides full analytics, activity timeline, and metrics
     assert.ok(body.fitSummary !== undefined);
     assert.ok(body.pipelineVelocity.length > 0);
 });
+
