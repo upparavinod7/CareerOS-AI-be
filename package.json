@@ -7,7 +7,7 @@
     "dev": "nodemon index.js",
     "start": "node index.js",
     "seed:jobs": "node scripts/seedJobs.js",
-    "test": "node --test tests/api.test.js"
+    "test": "node --test --test-concurrency=1 tests/api.test.js tests/autoApply.test.js"
   },
   "keywords": [
     "careeros",

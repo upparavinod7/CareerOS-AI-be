@@ -536,13 +536,40 @@ function evaluateInterviewAnswer(role, currentAnswer, question = "") {
     };
 }
 
+function evaluateJobFit(user, job) {
+    let jobSkills = (job && job.skills && job.skills.length > 0)
+        ? job.skills
+        : (job && job.requirements && job.requirements.length > 0)
+            ? job.requirements
+            : [];
+
+    if (!jobSkills || jobSkills.length === 0) {
+        jobSkills = extractKeywords(`${job?.title || ""} ${job?.description || ""}`);
+    }
+
+    const userSkills = (user && user.skills) || [];
+    const experienceYears = (user && user.experienceYears) || 0;
+    const resumeText = (user && user.resumeText) || "";
+
+    const fit = calculateFitScore(jobSkills, userSkills, experienceYears, resumeText);
+    return {
+        score: fit.matchPercentage,
+        matchingSkills: fit.strongSkills || [],
+        partiallyMatchingSkills: fit.partiallyMatchingSkills || [],
+        missingSkills: fit.missingSkills || [],
+        suggestions: fit.suggestions || []
+    };
+}
+
 module.exports = {
     calculateFitScore,
+    evaluateJobFit,
     extractKeywords,
     predictCareerRoles,
     generateRoadmap,
     suggestResumeImprovements,
     generateCoverLetterDraft,
+    generateCoverLetter: generateCoverLetterDraft,
     generateInterviewGuidance,
     evaluateInterviewAnswer,
     roleSkillMap,

@@ -8,6 +8,8 @@ const jobRoutes = require("./routes/jobRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 const applicationRoutes = require("./routes/applicationRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const integrationRoutes = require("./routes/integrationRoutes");
+const autoApplyRoutes = require("./routes/autoApplyRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const { securityHeaders, rateLimiter } = require("./middleware/security");
 const { notFound, errorHandler } = require("./middleware/errorHandlers");
@@ -60,6 +62,8 @@ app.use("/api/v1/jobs", jobRoutes);
 app.use("/api/v1/ai", aiRoutes);
 app.use("/api/v1/applications", applicationRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/integrations", integrationRoutes);
+app.use("/api/v1/auto-apply", autoApplyRoutes);
 app.use("/api/v1/admin", adminRoutes);
 
 app.use(notFound);
