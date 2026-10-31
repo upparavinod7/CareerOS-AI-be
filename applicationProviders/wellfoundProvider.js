@@ -58,3 +58,4 @@ class WellfoundProvider extends BaseProvider {
 }
 
 module.exports = new WellfoundProvider();
+
