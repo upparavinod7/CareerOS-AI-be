@@ -42,13 +42,6 @@ test.before(async () => {
     baseUrl = `http://127.0.0.1:${port}`;
 });
 
-test.after(async () => {
-    if (server) {
-        await new Promise(resolve => server.close(resolve));
-    }
-    await disconnectDB();
-});
-
 test("Health check returns ok and database status", async () => {
     const res = await fetch(`${baseUrl}/health`);
     assert.strictEqual(res.status, 200);
@@ -473,5 +466,13 @@ test("Career Dashboard - provides full analytics, activity timeline, and metrics
     assert.ok(body.statusBreakdown !== undefined);
     assert.ok(body.fitSummary !== undefined);
     assert.ok(body.pipelineVelocity.length > 0);
+});
+
+test.after(async () => {
+    if (server) {
+        server.closeAllConnections?.();
+        await new Promise((resolve) => server.close(resolve));
+    }
+    await disconnectDB();
 });
 

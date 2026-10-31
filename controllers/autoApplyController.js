@@ -6,6 +6,8 @@ const { evaluateJobFit } = require("../utils/aiEngine");
 const { prepareApplicationPackage } = require("../utils/applicationPreparer");
 const { getProvider } = require("../applicationProviders");
 const { syncPublicJobs } = require("../utils/jobFeedService");
+const { getExecutionMetrics, triggerUserPipeline } = require("../queue/scheduler");
+const { submissionQueue } = require("../queue/autoApplyQueue");
 
 /**
  * Helper to retrieve or create default auto-apply settings
@@ -21,14 +23,16 @@ async function getOrCreateSettings(userId) {
 
 /**
  * GET /api/v1/auto-apply/overview
- * Real-time dashboard analytics
+ * Real-time dashboard analytics with honest queue & platform breakdown
  */
 async function getOverview(req, res, next) {
     try {
         const userId = req.user._id;
-        const settings = await getOrCreateSettings(userId);
+        const [settings, metrics] = await Promise.all([
+            getOrCreateSettings(userId),
+            getExecutionMetrics(userId)
+        ]);
 
-        // Aggregate actual status counts from database
         const counts = await Application.aggregate([
             { $match: { user: userId } },
             { $group: { _id: "$status", count: { $sum: 1 } } }
@@ -39,30 +43,29 @@ async function getOverview(req, res, next) {
             statusMap[c._id] = c.count;
         });
 
-        // Total matching jobs discovered
-        const totalDiscovered = await Job.countDocuments();
-
         const data = {
-            totalDiscovered,
+            ...metrics,
             shortlisted: statusMap["Shortlisted"] || 0,
-            preparing: statusMap["Preparing"] || 0,
+            preparing: statusMap["Preparing"] || metrics.applicationsPrepared || 0,
             awaitingApproval: statusMap["Awaiting Approval"] || 0,
             readyToSubmit: statusMap["Ready to Submit"] || 0,
-            submitted: statusMap["Submitted"] || statusMap["Applied"] || 0,
-            failed: statusMap["Submission Failed"] || 0,
+            submitted: statusMap["Submitted"] || statusMap["Applied"] || metrics.applicationsSubmitted || 0,
+            failed: statusMap["Submission Failed"] || metrics.failedApplications || 0,
             interviews: statusMap["Interview"] || 0,
             offers: statusMap["Offer"] || 0,
             dailyProgress: {
                 submittedToday: settings.dailySubmittedCount,
                 dailyTarget: settings.dailyApplicationTarget,
                 canSubmitMore: settings.canSubmitToday(),
-                isPaused: settings.isPaused
+                isPaused: settings.isPaused,
+                scheduledTime: settings.scheduledExecutionTime || "09:00 IST"
             },
             settings: {
                 minMatchScore: settings.minMatchScore,
                 remoteOnly: settings.remoteOnly,
                 targetRoles: settings.targetRoles,
-                requireApproval: settings.requireApproval
+                requireApproval: settings.requireApproval,
+                dailyApplicationTarget: settings.dailyApplicationTarget
             }
         };
 
@@ -213,11 +216,13 @@ async function prepareApplication(req, res, next) {
             salary: job.salary ? `${job.salary.min || ""} - ${job.salary.max || ""} ${job.salary.currency || ""}` : "",
             jobUrl: job.sourceUrl || "",
             status: "Awaiting Approval",
+            pipelineStage: "APPLICATION_PREPARED",
             platform: provider.name,
             submissionMethod: capabilities.submissionMethod,
             resumeVersionId: prep.selectedResume.resumeId,
             resumeTitle: prep.selectedResume.title,
             resumeSnapshot: prep.selectedResume.snapshot,
+            generatedPdfBase64: prep.generatedPdfBase64 || "",
             coverLetter: prep.coverLetter,
             questionAnswers: prep.questionAnswers,
             matchScore: prep.matchScore,
@@ -350,21 +355,33 @@ async function submitApplication(req, res, next) {
         // 1. Direct API Submission (Greenhouse, Lever where configured)
         if (capabilities.applicationSubmission && capabilities.submissionMethod === "direct") {
             try {
+                application.pipelineStage = "SUBMITTING";
+                await application.save();
+
                 const submissionResult = await provider.submitDirect({
                     candidateName: user.name,
                     candidateEmail: user.email,
                     candidatePhone: user.phone,
                     resumeSnapshot: application.resumeSnapshot,
+                    generatedPdfBase64: application.generatedPdfBase64,
                     coverLetter: application.coverLetter,
                     questionAnswers: application.questionAnswers,
+                    jobUrl: application.jobUrl || application.job?.sourceUrl || "",
                     jobId: application.job?._id || application.jobTitle
                 });
 
                 application.status = "Submitted";
+                application.pipelineStage = "SUBMITTED";
                 application.providerConfirmation = {
                     confirmationId: submissionResult.confirmationId,
                     responseMessage: "Direct submission accepted by platform API.",
                     submittedAt: new Date()
+                };
+                application.submissionEvidence = {
+                    confirmationId: submissionResult.confirmationId,
+                    rawResponse: submissionResult.responsePayload || {},
+                    timestamp: new Date(),
+                    verified: true
                 };
                 application.appliedAt = new Date();
                 await application.save();
@@ -380,6 +397,8 @@ async function submitApplication(req, res, next) {
                 });
             } catch (submitErr) {
                 application.status = "Submission Failed";
+                application.pipelineStage = "FAILED";
+                application.failureReason = submitErr.message;
                 application.notes = submitErr.message;
                 await application.save();
 
@@ -391,7 +410,10 @@ async function submitApplication(req, res, next) {
             }
         }
 
-        // 2. Guided Application Workflow (LinkedIn, Indeed, Generic Career Portals)
+        // 2. Guided Application Workflow (LinkedIn, Indeed, Wellfound, Internshala, Generic Portals)
+        application.pipelineStage = "REQUIRES_MANUAL_ACTION";
+        await application.save();
+
         const guidedPackage = await provider.generateGuidedPackage({
             jobUrl: application.jobUrl || application.job?.sourceUrl || "https://www.linkedin.com/jobs",
             questionAnswers: application.questionAnswers,
@@ -432,10 +454,18 @@ async function confirmGuidedSubmission(req, res, next) {
         }
 
         application.status = "Submitted";
+        application.pipelineStage = "SUBMITTED";
+        const finalConfId = confirmationId || `CONF-${Date.now().toString().slice(-6)}`;
         application.providerConfirmation = {
-            confirmationId: confirmationId || `CONF-${Date.now().toString().slice(-6)}`,
+            confirmationId: finalConfId,
             responseMessage: notes || "External submission verified and confirmed by candidate.",
             submittedAt: new Date()
+        };
+        application.submissionEvidence = {
+            confirmationId: finalConfId,
+            rawResponse: { confirmationId: finalConfId, notes, method: "guided" },
+            timestamp: new Date(),
+            verified: true
         };
         application.appliedAt = new Date();
         await application.save();
@@ -446,6 +476,41 @@ async function confirmGuidedSubmission(req, res, next) {
         return res.json({
             success: true,
             message: "Guided submission confirmed and recorded in your career tracker.",
+            data: application
+        });
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
+ * POST /api/v1/auto-apply/:id/retry
+ * Re-queues a failed application for submission retry
+ */
+async function retryApplication(req, res, next) {
+    try {
+        const { id } = req.params;
+        const application = await Application.findOne({ _id: id, user: req.user._id });
+        if (!application) {
+            return res.status(404).json({ success: false, message: "Application not found." });
+        }
+
+        application.pipelineStage = "READY_TO_SUBMIT";
+        application.status = "Ready to Submit";
+        application.failureReason = "";
+        application.retryCount = (application.retryCount || 0) + 1;
+        application.lastRetryAt = new Date();
+        await application.save();
+
+        // Enqueue to submission queue
+        await submissionQueue.add("retry_submission", {
+            userId: req.user._id,
+            applicationId: application._id
+        });
+
+        return res.json({
+            success: true,
+            message: "Application re-queued for submission.",
             data: application
         });
     } catch (err) {
@@ -758,5 +823,6 @@ module.exports = {
     getSettings,
     updateSettings,
     syncJobsNow,
-    runAutoApply
+    runAutoApply,
+    retryApplication
 };

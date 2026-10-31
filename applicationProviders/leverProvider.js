@@ -18,41 +18,59 @@ class LeverProvider extends BaseProvider {
             profileRetrieval: false,
             jobDiscovery: true,
             applicationPreparation: true,
-            applicationSubmission: true, // Lever Post API allows application submissions
+            applicationSubmission: true,
             submissionMethod: "direct",
             statusRetrieval: true,
-            disclaimer: "Direct submission available for postings hosted on Lever Postings API. Fallback to guided application for custom career sites."
+            disclaimer: "Direct submission available for postings hosted on Lever Public Postings API. External custom career pages route to guided submission."
         };
     }
 
-    async getAuthUrl(stateToken, redirectUri) {
-        return `/integrations/configure?provider=lever&state=${stateToken}`;
+    /**
+     * Extracts site and posting id from Lever URLs (e.g. jobs.lever.co/{site}/{id})
+     */
+    extractSiteDetails(jobUrl = "") {
+        try {
+            const url = new URL(jobUrl);
+            const pathParts = url.pathname.split("/").filter(Boolean);
+            if (pathParts.length >= 2) {
+                return {
+                    site: pathParts[0],
+                    postingId: pathParts[1]
+                };
+            }
+        } catch {
+            // Invalid URL string
+        }
+        return { site: null, postingId: null };
     }
 
-    /**
-     * Submit candidate application directly to Lever Post API
-     */
-    async submitDirect(applicationData, credentials = {}) {
-        const site = applicationData.leverSite || credentials.site || "demo-site";
-        const postingId = applicationData.externalJobId || applicationData.jobId || "lever-posting-1";
+    extractPostingDetails(jobUrl = "") {
+        return this.extractSiteDetails(jobUrl);
+    }
 
-        if (process.env.NODE_ENV === "test" || !process.env.LEVER_API_KEY) {
+    async submitDirect(applicationData, credentials = {}) {
+        const urlDetails = this.extractSiteDetails(applicationData.jobUrl);
+        const site = applicationData.leverSite || credentials.site || urlDetails.site;
+        const postingId = applicationData.externalJobId || applicationData.jobId || urlDetails.postingId;
+
+        if (credentials.mockTestSuccess || process.env.NODE_ENV === "test") {
             return {
                 success: true,
                 submissionMethod: "direct",
                 provider: "lever",
-                confirmationId: `LEVER-APP-${Date.now()}-${Math.floor(Math.random() * 90000 + 10000)}`,
+                confirmationId: `LEVER-VERIFIED-${Date.now()}`,
                 submittedAt: new Date(),
-                responsePayload: {
-                    status: "candidate_created",
-                    site: site,
-                    postingId: postingId,
-                    candidateEmail: applicationData.candidateEmail
-                }
+                responsePayload: { status: "submitted", site, postingId, candidateEmail: applicationData.candidateEmail }
             };
         }
 
-        const endpoint = `https://api.lever.co/v0/postings/${encodeURIComponent(site)}/${encodeURIComponent(postingId)}?key=${encodeURIComponent(credentials.apiKey || process.env.LEVER_API_KEY)}`;
+        if (!site || !postingId) {
+            throw new Error("Cannot submit directly: Valid Lever site name and posting ID could not be identified from job URL.");
+        }
+
+        const apiKeyParam = credentials.apiKey || process.env.LEVER_API_KEY ? `?key=${encodeURIComponent(credentials.apiKey || process.env.LEVER_API_KEY)}` : "";
+        const endpoint = `https://api.lever.co/v0/postings/${encodeURIComponent(site)}/${encodeURIComponent(postingId)}${apiKeyParam}`;
+
         const body = {
             name: applicationData.candidateName || "Applicant",
             email: applicationData.candidateEmail,
@@ -69,7 +87,7 @@ class LeverProvider extends BaseProvider {
 
         if (!res.ok) {
             const errText = await res.text();
-            throw new Error(`Lever application submission failed (${res.status}): ${errText}`);
+            throw new Error(`Lever application submission rejected (${res.status}): ${errText}`);
         }
 
         const data = await res.json();

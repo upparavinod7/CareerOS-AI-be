@@ -7,7 +7,7 @@
     "dev": "nodemon index.js",
     "start": "node index.js",
     "seed:jobs": "node scripts/seedJobs.js",
-    "test": "node --test --test-concurrency=1 tests/api.test.js tests/autoApply.test.js tests/resumeIntelligence.test.js",
+    "test": "NODE_ENV=test node --test --test-concurrency=1 tests/api.test.js tests/autoApply.test.js tests/autoApplyPipeline.test.js tests/resumeIntelligence.test.js",
     "start:ai": "cd ai-service && PYTHONPATH=. venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001",
     "test:ai": "cd ai-service && PYTHONPATH=. venv/bin/pytest tests/ -v"
   },
@@ -21,9 +21,11 @@
   "type": "commonjs",
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "bullmq": "^6.5.3",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
     "express": "^5.2.1",
+    "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongodb-memory-server": "^10.1.4",
     "mongoose": "^8.20.1",

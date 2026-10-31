@@ -3,6 +3,7 @@ require("dotenv").config();
 const app = require("./app");
 const { connectDBWithRetry } = require("./config/db");
 const { startJobsSyncScheduler } = require("./utils/jobFeedService");
+const { initScheduler } = require("./queue/scheduler");
 
 const PORT = Number(process.env.PORT) || 5000;
 
@@ -15,3 +16,4 @@ connectDBWithRetry().catch(error => {
 });
 
 startJobsSyncScheduler();
+initScheduler();

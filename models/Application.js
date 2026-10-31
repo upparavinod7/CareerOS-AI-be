@@ -25,6 +25,20 @@ const applicationSchema = new mongoose.Schema(
         status: {
             type: String,
             enum: [
+                // Pipeline lifecycle states
+                "JOB_DISCOVERED",
+                "JOB_VALIDATED",
+                "JOB_MATCHED",
+                "APPLICATION_PREPARED",
+                "READY_TO_SUBMIT",
+                "SUBMITTING",
+                "SUBMITTED",
+                "FAILED",
+                "REQUIRES_MANUAL_ACTION",
+                "AWAITING_USER_REVIEW",
+                "DUPLICATE",
+                "EXPIRED",
+                // Display and tracker lifecycle aliases
                 "Discovered",
                 "Shortlisted",
                 "Preparing",
@@ -37,17 +51,35 @@ const applicationSchema = new mongoose.Schema(
                 "Offer",
                 "Rejected",
                 "Withdrawn",
-                // Backward compatibility alias for legacy data
                 "Interested",
                 "Applied"
             ],
             default: "Awaiting Approval"
+        },
+        pipelineStage: {
+            type: String,
+            enum: [
+                "JOB_DISCOVERED",
+                "JOB_VALIDATED",
+                "JOB_MATCHED",
+                "APPLICATION_PREPARED",
+                "READY_TO_SUBMIT",
+                "SUBMITTING",
+                "SUBMITTED",
+                "FAILED",
+                "REQUIRES_MANUAL_ACTION",
+                "AWAITING_USER_REVIEW",
+                "DUPLICATE",
+                "EXPIRED"
+            ],
+            default: "JOB_DISCOVERED"
         },
         platform: { type: String, default: "Generic", trim: true },
         submissionMethod: { type: String, enum: ["direct", "guided"], default: "guided" },
         resumeVersionId: { type: String, default: null },
         resumeTitle: { type: String, default: "Default Resume" },
         resumeSnapshot: { type: String, default: "" },
+        generatedPdfBase64: { type: String, default: "" },
         coverLetter: { type: String, default: "" },
         questionAnswers: { type: [questionAnswerSchema], default: [] },
         approvalRecord: {
@@ -60,6 +92,15 @@ const applicationSchema = new mongoose.Schema(
             responseMessage: { type: String, default: "" },
             submittedAt: { type: Date, default: null }
         },
+        submissionEvidence: {
+            confirmationId: { type: String, default: null },
+            rawResponse: { type: mongoose.Schema.Types.Mixed, default: null },
+            timestamp: { type: Date, default: null },
+            verified: { type: Boolean, default: false }
+        },
+        failureReason: { type: String, default: "" },
+        retryCount: { type: Number, default: 0 },
+        lastRetryAt: { type: Date, default: null },
         matchScore: { type: Number, default: 0, min: 0, max: 100 },
         matchingSkills: { type: [String], default: [] },
         missingSkills: { type: [String], default: [] },

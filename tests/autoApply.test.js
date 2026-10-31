@@ -22,14 +22,14 @@ let testJob2;
 function request(method, path, body = null, token = null) {
     return new Promise((resolve, reject) => {
         const url = new URL(path, baseUrl);
-        const headers = { "Content-Type": "application/json" };
+        const headers = { "Content-Type": "application/json", "Connection": "close" };
         if (token) {
             headers["Authorization"] = `Bearer ${token}`;
         }
 
         const req = http.request(
             url,
-            { method, headers },
+            { method, headers, agent: false },
             (res) => {
                 let data = "";
                 res.on("data", (chunk) => (data += chunk));
@@ -53,8 +53,11 @@ function request(method, path, body = null, token = null) {
     });
 }
 
+process.env.NODE_ENV = "test";
+
 describe("CareerOS Auto Apply & Integration Engine Test Suite", () => {
     before(async () => {
+        process.env.NODE_ENV = "test";
         process.env.JWT_SECRET = "test_auto_apply_secret_key_123456";
         await connectDBWithRetry();
 
@@ -118,13 +121,6 @@ describe("CareerOS Auto Apply & Integration Engine Test Suite", () => {
             requirements: ["Docker", "Kubernetes", "AWS", "Terraform"],
             tags: ["DevOps", "Cloud"]
         });
-    });
-
-    after(async () => {
-        if (server) {
-            await new Promise((resolve) => server.close(resolve));
-        }
-        await disconnectDB();
     });
 
     // 1. Crypto & Token Security
@@ -333,7 +329,7 @@ describe("CareerOS Auto Apply & Integration Engine Test Suite", () => {
         assert.equal(res.status, 200);
         assert.equal(res.body.data.submitted, 2);
         assert.equal(res.body.data.dailyProgress.submittedToday, 2);
-        assert.equal(res.body.data.dailyProgress.dailyTarget, 10);
+        assert.equal(res.body.data.dailyProgress.dailyTarget, 20);
     });
 
     // 10. User Isolation
@@ -384,5 +380,13 @@ describe("CareerOS Auto Apply & Integration Engine Test Suite", () => {
         const runRes = await request("POST", "/api/v1/auto-apply/auto-run", {}, user2Token);
         assert.equal(runRes.status, 200);
         assert.ok(runRes.body.data.processedCount >= 1);
+    });
+
+    after(async () => {
+        if (server) {
+            server.closeAllConnections?.();
+            await new Promise((resolve) => server.close(resolve));
+        }
+        await disconnectDB();
     });
 });

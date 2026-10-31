@@ -14,7 +14,8 @@ const {
     getSettings,
     updateSettings,
     syncJobsNow,
-    runAutoApply
+    runAutoApply,
+    retryApplication
 } = require("../controllers/autoApplyController");
 
 const router = express.Router();
@@ -31,6 +32,7 @@ router.post("/:id/approve", approveApplication);
 router.patch("/:id/answers", updateApplicationAnswers);
 router.post("/:id/submit", submitApplication);
 router.post("/:id/confirm-guided", confirmGuidedSubmission);
+router.post("/:id/retry", retryApplication);
 router.post("/:id/reject", rejectApplication);
 router.get("/history", getHistory);
 router.get("/settings", getSettings);
