@@ -24,14 +24,21 @@ const origins = (process.env.CLIENT_ORIGINS || "http://localhost:5173,http://127
 app.use(securityHeaders);
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps, curl, server-to-server)
-        if (!origin || origins.includes(origin) || origin.includes("localhost") || origin.includes("127.0.0.1")) {
-            return callback(null, true);
-        }
-        return callback(null, true); // Permissive in development
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    // Allow requests without an Origin header (server-to-server, curl)
+    if (!origin) {
+        return callback(null, true);
+    }
+
+    const isDevelopment =
+        process.env.NODE_ENV !== "production" &&
+        (origin.includes("localhost") || origin.includes("127.0.0.1"));
+
+    if (origins.includes(origin) || isDevelopment) {
+        return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+},
 }));
 
 app.use(express.json({ limit: "25mb" }));
