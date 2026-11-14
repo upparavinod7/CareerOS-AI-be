@@ -15,9 +15,24 @@ class LLMService:
     async def optimize_bullet(cls, original_bullet: str, target_role: str, technologies: list) -> Dict[str, str]:
         """
         Optimizes a single bullet point.
-        Uses OpenAI if configured, otherwise applies deterministic XYZ rewrite with factual preservation.
+        Uses OpenAI or Gemini if configured, otherwise applies deterministic XYZ rewrite with factual preservation.
         """
-        api_key = settings.OPENAI_API_KEY
+        # 1. Try Gemini if configured
+        gemini_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY", "")
+        if gemini_key and len(gemini_key) > 10:
+            try:
+                improved = await cls._call_gemini(original_bullet, target_role, technologies, gemini_key)
+                if improved:
+                    return {
+                        "improved": improved,
+                        "framework": "Google XYZ formula (Accomplished [X] by doing [Z])",
+                        "engine": "llm_gemini"
+                    }
+            except Exception:
+                pass
+
+        # 2. Try OpenAI if configured
+        api_key = settings.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY", "")
         if api_key and api_key.startswith("sk-") and len(api_key) > 20:
             try:
                 improved = await cls._call_openai(original_bullet, target_role, technologies)
@@ -30,13 +45,47 @@ class LLMService:
             except Exception:
                 pass  # Fall back to deterministic semantic rewrite
 
-        # Deterministic semantic rewrite
+        # 3. Deterministic semantic rewrite
         improved = cls._deterministic_rewrite(original_bullet, target_role, technologies)
         return {
             "improved": improved,
             "framework": "Google XYZ formula (Accomplished [X] by doing [Z])",
             "engine": "deterministic_xyz_engine"
         }
+
+    @classmethod
+    async def _call_gemini(cls, bullet: str, target_role: str, technologies: list, api_key: str) -> Optional[str]:
+        sanitized_bullet = re.sub(r"[\n\r]+", " ", bullet).strip()
+        sanitized_role = re.sub(r"[^\w\s-]", "", target_role).strip()
+
+        prompt = (
+            "You are a Principal Resume Editor. Rewrite the candidate's bullet point following the Google XYZ formula: "
+            "'Accomplished [X], as measured by [Y], by doing [Z]'.\n"
+            "STRICT RULES:\n"
+            "1. NEVER invent metrics, percentages, dollar amounts, dates, or company names not already in the input.\n"
+            "2. Start with a strong action verb (e.g. Engineered, Architected, Spearheaded, Deployed, Streamlined).\n"
+            "3. Maintain 100% factual fidelity to what the candidate actually accomplished.\n"
+            "4. Return ONLY the rewritten single bullet point, without quotation marks or conversational commentary.\n\n"
+            f"Target Role: {sanitized_role}\n"
+            f"Technologies: {', '.join(technologies)}\n"
+            f"Original Bullet: {sanitized_bullet}\n\n"
+            "Rewritten Bullet:"
+        )
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 150}
+        }
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url, json=payload)
+            if resp.status_code == 200:
+                data = resp.json()
+                text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                text = re.sub(r"^[\"'\-•\s]+|[\"'\s]+$", "", text)
+                return text
+        return None
 
     @classmethod
     async def _call_openai(cls, bullet: str, target_role: str, technologies: list) -> Optional[str]:

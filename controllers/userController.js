@@ -25,6 +25,8 @@ exports.updateMe = async (req, res, next) => {
     try {
         const allowedFields = [
             "name",
+            "phone",
+            "location",
             "headline",
             "bio",
             "skills",
@@ -32,9 +34,16 @@ exports.updateMe = async (req, res, next) => {
             "targetRole",
             "preferredLocations",
             "preferredWorkType",
+            "noticePeriod",
+            "expectedSalary",
             "resumeText",
+            "resumeFileName",
+            "resumeFileBase64",
+            "resumeStructured",
+            "resumeAtsScore",
             "education",
             "experience",
+            "projects",
             "certifications"
         ];
 
