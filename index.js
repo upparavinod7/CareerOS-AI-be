@@ -7,7 +7,7 @@ const { initScheduler } = require("./queue/scheduler");
 
 const PORT = Number(process.env.PORT) || 5000;
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
     console.log(`CareerOS AI API running on port ${PORT}`);
 });
 
