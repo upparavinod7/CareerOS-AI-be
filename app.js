@@ -16,7 +16,7 @@ const { notFound, errorHandler } = require("./middleware/errorHandlers");
 
 const app = express();
 
-const origins = (process.env.CLIENT_ORIGINS || "http://localhost:5173,http://127.0.0.1:5173")
+const origins = (process.env.CLIENT_ORIGINS || "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000")
     .split(",")
     .map(origin => origin.trim())
     .filter(Boolean);
@@ -24,21 +24,25 @@ const origins = (process.env.CLIENT_ORIGINS || "http://localhost:5173,http://127
 app.use(securityHeaders);
 app.use(cors({
     origin: (origin, callback) => {
-    // Allow requests without an Origin header (server-to-server, curl)
-    if (!origin) {
-        return callback(null, true);
-    }
+        // Allow requests without an Origin header (server-to-server, curl, Postman)
+        if (!origin) {
+            return callback(null, true);
+        }
 
-    const isDevelopment =
-        process.env.NODE_ENV !== "production" &&
-        (origin.includes("localhost") || origin.includes("127.0.0.1"));
+        const isLocalhost =
+            origin.includes("localhost") ||
+            origin.includes("127.0.0.1") ||
+            origin.includes("0.0.0.0");
 
-    if (origins.includes(origin) || isDevelopment) {
-        return callback(null, true);
-    }
+        if (origins.includes(origin) || (process.env.NODE_ENV !== "production" && isLocalhost) || isLocalhost) {
+            return callback(null, true);
+        }
 
-    return callback(new Error("Not allowed by CORS"));
-},
+        return callback(null, false);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
 }));
 
 app.use(express.json({ limit: "25mb" }));
