@@ -53,33 +53,10 @@ async function startInMemoryMongo() {
     console.warn("⚠️  [Database] Running in-memory MongoDB fallback. Data will reset upon process restart!");
 }
 
-const bcrypt = require("bcryptjs");
-
-async function seedDefaultData() {
+async function seedDefaultJobs() {
     try {
-        const User = require("../models/User");
         const Job = require("../models/Job");
         const { mockJobs } = require("../utils/mockJobs");
-
-        // Seed demo user if not present
-        const demoEmail = "demo@careeros.ai";
-        const existingDemo = await User.findOne({ email: demoEmail });
-        if (!existingDemo) {
-            const hashedPassword = await bcrypt.hash("password123", 10);
-            await User.create({
-                name: "Demo Candidate",
-                email: demoEmail,
-                password: hashedPassword,
-                targetRole: "Full Stack Engineer",
-                headline: "Full Stack Software Engineer & AI Systems Architect",
-                bio: "Passionate software engineer building resilient cloud services and AI career workflows.",
-                skills: ["javascript", "react", "node.js", "python", "docker", "mongodb", "fastapi"],
-                experienceYears: 4,
-                preferredWorkType: "Remote",
-                resumeText: "Demo Candidate\nFull Stack Engineer\nEmail: demo@careeros.ai\nLocation: San Francisco, CA\n\nExperience:\nFull Stack Engineer at Tech Corp (2022 - Present)\n• Built scalable backend services with Node.js and Python\n• Developed modern responsive UI components with React\n\nEducation:\nB.S. in Computer Science (2022)"
-            });
-            console.log("[Database] Seeded default demo account: demo@careeros.ai / password123");
-        }
 
         // Seed initial jobs if empty
         const jobCount = await Job.countDocuments();
@@ -113,7 +90,7 @@ function scheduleReconnect() {
                 await mongoose.disconnect();
             }
             await connectDB();
-            await seedDefaultData();
+            await seedDefaultJobs();
             console.log("[Database] Reconnected to external MongoDB successfully");
         } catch (error) {
             console.warn(`[Database] Reconnect attempt failed: ${error.message}`);
@@ -125,7 +102,7 @@ function scheduleReconnect() {
 async function connectDBWithRetry() {
     try {
         await connectDB();
-        await seedDefaultData();
+        await seedDefaultJobs();
     } catch (error) {
         console.warn(`[Database] External MongoDB connection failed: ${error.message}`);
 
@@ -135,7 +112,7 @@ async function connectDBWithRetry() {
 
         try {
             await startInMemoryMongo();
-            await seedDefaultData();
+            await seedDefaultJobs();
         } catch (memoryError) {
             console.error(`[Database] In-memory MongoDB fallback failed: ${memoryError.message}`);
             scheduleReconnect();
